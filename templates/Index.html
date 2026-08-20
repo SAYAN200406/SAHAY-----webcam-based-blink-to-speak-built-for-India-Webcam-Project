@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>SAHAY - Head-Controlled Assistive Interface</title>
+
+    <!-- Flask serves CSS from the static folder -->
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='Css.css') }}">
+</head>
+
+<body>
+
+    <!-- NAV -->
+    <div id="nav">
+
+        <img src="{{ url_for('static', filename='mods.jpg') }}"
+             height="40"
+             >
+
+        <span id="nav1">
+            
+        </span>
+
+    </div>
+
+
+    <!-- HEADER -->
+    <header id="navber">
+
+        <div id="logo">
+            SAHAY
+        </div>
+
+        <div id="tracking1">
+
+            <div id="box">
+                0
+            </div>
+
+            <div id="tracking">
+                <span class="dot" id="statusDot">&#9679;</span>
+                <span id="statusText">Tracking inactive</span>
+            </div>
+
+        </div>
+
+    </header>
+
+
+    <!-- TRACKING CONTROLS -->
+    <div id="controls">
+
+        <button id="start">
+            START TRACKING
+        </button>
+
+        <button id="stop">
+            STOP TRACKING
+        </button>
+
+    </div>
+
+
+    <!-- MAIN CONTENT -->
+    <main id="container">
+
+        <div id="board">
+
+            <b>COMMUNICATION BOARD</b>
+
+            <span id="dot">.</span>
+
+            <span>
+                look at a button and hold your gaze to select
+            </span>
+
+        </div>
+
+
+        <section id="communicationboard">
+
+            <!-- YES -->
+            <button class="icon-div" id="first">
+
+                <div id="icon1">
+                    &#10004;
+                </div>
+
+                <div id="text">
+                    <p>YES</p>
+                </div>
+
+            </button>
+
+
+            <!-- NO -->
+            <button class="icon-div" id="second">
+
+                <div id="icon1">
+                    &#10060;
+                </div>
+
+                <div id="text">
+                    <p>NO</p>
+                </div>
+
+            </button>
+
+
+            <!-- WATER -->
+            <button class="icon-div" id="theird">
+
+                <div id="icon1">
+                    &#x1F4A7;
+                </div>
+
+                <div id="text">
+                    <p>I NEED WATER</p>
+                </div>
+
+            </button>
+
+
+            <!-- BATHROOM -->
+            <button class="icon-div" id="forth">
+
+                <div id="icon1">
+                    &#x1F6BD;
+                </div>
+
+                <div id="text">
+                    <p>BATHROOM / TOILET</p>
+                </div>
+
+            </button>
+
+
+            <!-- FOOD -->
+            <button class="icon-div" id="fifth">
+
+                <div id="icon1">
+                    &#127860;
+                </div>
+
+                <div id="text">
+                    <p>I NEED FOOD</p>
+                </div>
+
+            </button>
+
+
+            <!-- REPOSITION -->
+            <button class="icon-div" id="six">
+
+                <div id="icon1">
+                    <b>&#8634;</b>
+                </div>
+
+                <div id="text">
+                    <p>REPOSITION ME</p>
+                </div>
+
+            </button>
+
+
+            <!-- HELP -->
+            <button class="icon-div" id="seventh">
+
+                <div id="icon1">
+                    &#x270B;
+                </div>
+
+                <div id="text">
+                    <p>I NEED HELP</p>
+                </div>
+
+            </button>
+
+
+            <!-- CAREGIVER -->
+            <button class="icon-div" id="eight">
+
+                <div id="icon1">
+                    &#128222;
+                </div>
+
+                <div id="text">
+                    <p>CALL CAREGIVER</p>
+                </div>
+
+            </button>
+
+
+            <!-- EMERGENCY -->
+            <button class="icon-div" id="nine">
+
+                <div id="icon1">
+                    &#9888;
+                </div>
+
+                <div id="text">
+                    <p>EMERGENCY</p>
+                </div>
+
+            </button>
+
+        </section>
+
+    </main>
+
+
+    <!-- FOOTER -->
+    <footer>
+        Hands-free control via webcam head tracking -- SAHAY
+    </footer>
+
+
+    <!-- FLASK + PYTHON CONNECTION -->
+    <script>
+
+        const startButton = document.getElementById("start");
+        const stopButton = document.getElementById("stop");
+
+        const statusText = document.getElementById("statusText");
+        const statusDot = document.getElementById("statusDot");
+
+
+        // START TRACKING
+        startButton.addEventListener("click", async () => {
+
+            try {
+
+                statusText.textContent = "Starting...";
+
+                const response = await fetch("/start", {
+                    method: "POST"
+                });
+
+                const data = await response.json();
+
+                statusText.textContent = data.message;
+
+                if (data.status === "started" ||
+                    data.status === "already_running") {
+
+                    statusDot.style.color = "green";
+
+                }
+
+            } catch (error) {
+
+                console.error(error);
+
+                statusText.textContent =
+                    "Unable to start tracking";
+
+                statusDot.style.color = "red";
+
+            }
+
+        });
+
+
+        // STOP TRACKING
+        stopButton.addEventListener("click", async () => {
+
+            try {
+
+                const response = await fetch("/stop", {
+                    method: "POST"
+                });
+
+                const data = await response.json();
+
+                statusText.textContent = data.message;
+
+                statusDot.style.color = "red";
+
+            } catch (error) {
+
+                console.error(error);
+
+                statusText.textContent =
+                    "Unable to stop tracking";
+
+            }
+
+        });
+
+
+        // CHECK TRACKING STATUS
+        async function checkStatus() {
+
+            try {
+
+                const response = await fetch("/status");
+
+                const data = await response.json();
+
+                if (data.running) {
+
+                    statusText.textContent =
+                        "Tracking active";
+
+                    statusDot.style.color = "green";
+
+                } else {
+
+                    statusText.textContent =
+                        "Tracking inactive";
+
+                    statusDot.style.color = "red";
+
+                }
+
+            } catch (error) {
+
+                console.error(error);
+
+            }
+
+        }
+
+
+        // Check when page loads
+        checkStatus();
+
+    </script>
+
+</body>
+
+</html>
