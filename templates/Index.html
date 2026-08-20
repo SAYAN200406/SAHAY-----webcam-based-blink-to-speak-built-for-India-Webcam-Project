@@ -84,7 +84,7 @@
         <section id="communicationboard">
 
             <!-- YES -->
-            <button class="icon-div" id="first">
+            <button class="icon-div" id="first" onclick="voiceClick('YES')">
 
                 <div id="icon1">
                     &#10004;
@@ -98,7 +98,7 @@
 
 
             <!-- NO -->
-            <button class="icon-div" id="second">
+            <button class="icon-div" id="second" onclick="voiceClick('NO')">
 
                 <div id="icon1">
                     &#10060;
@@ -112,7 +112,7 @@
 
 
             <!-- WATER -->
-            <button class="icon-div" id="theird">
+            <button class="icon-div" id="theird" onclick="voiceClick('WATER')">
 
                 <div id="icon1">
                     &#x1F4A7;
@@ -126,7 +126,7 @@
 
 
             <!-- BATHROOM -->
-            <button class="icon-div" id="forth">
+            <button class="icon-div" id="forth" onclick="voiceClick('BATHROOM')">
 
                 <div id="icon1">
                     &#x1F6BD;
@@ -140,7 +140,7 @@
 
 
             <!-- FOOD -->
-            <button class="icon-div" id="fifth">
+            <button class="icon-div" id="fifth" onclick="voiceClick('FOOD')">
 
                 <div id="icon1">
                     &#127860;
@@ -154,7 +154,7 @@
 
 
             <!-- REPOSITION -->
-            <button class="icon-div" id="six">
+            <button class="icon-div" id="six" onclick="voiceClick('REPOSITION')">
 
                 <div id="icon1">
                     <b>&#8634;</b>
@@ -168,7 +168,7 @@
 
 
             <!-- HELP -->
-            <button class="icon-div" id="seventh">
+            <button class="icon-div" id="seventh" onclick="voiceClick('HELP')">
 
                 <div id="icon1">
                     &#x270B;
@@ -182,7 +182,7 @@
 
 
             <!-- CAREGIVER -->
-            <button class="icon-div" id="eight">
+            <button class="icon-div" id="eight" onclick="voiceClick('CAREGIVER')" >
 
                 <div id="icon1">
                     &#128222;
@@ -196,7 +196,7 @@
 
 
             <!-- EMERGENCY -->
-            <button class="icon-div" id="nine">
+            <button class="icon-div" id="nine" onclick="voiceClick('EMERGENCY')" >
 
                 <div id="icon1">
                     &#9888;
@@ -328,6 +328,17 @@
 
         // Check when page loads
         checkStatus();
+        //voice making transcription
+        function speak(text) {
+    const voice = new SpeechSynthesisUtterance(text);
+    voice.rate = 1;
+    voice.volume = 1;
+    window.speechSynthesis.speak(voice);
+}
+
+function voiceClick(buttonName) {
+    speak(buttonName + " clicked");
+}
 
     </script>
 
