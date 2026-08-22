@@ -52,9 +52,13 @@ MODEL_URL = (
 SMOOTHING = 5
 BLINK_THRESHOLD = 0.21
 CLICK_COOLDOWN = 5
+MIN_BLINK_FRAMES = 6  # frames eye must stay closed before it counts as intentional
 CAM_INDEX = 0
 CALIB_SAMPLES = 20
 CALIB_MARGIN = 0.08
+CLAHE_BRIGHTNESS_THRESHOLD = 120  # only apply CLAHE below this mean brightness
+
+clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
 
 # ============================================================
@@ -157,6 +161,18 @@ def eye_aspect_ratio(landmarks, top_idx, bottom_idx, left_idx, right_idx):
     ) ** 0.5
 
     return vertical / horizontal if horizontal else 1.0
+
+
+def apply_clahe(frame_bgr):
+    """Boost contrast in low light so MediaPipe locks onto landmarks reliably."""
+    gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+    if gray.mean() > CLAHE_BRIGHTNESS_THRESHOLD:
+        return frame_bgr  # scene already bright enough, skip processing
+
+    lab = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    l = clahe.apply(l)
+    return cv2.cvtColor(cv2.merge((l, a, b)), cv2.COLOR_LAB2BGR)
 
 
 def get_gaze_raw(landmarks):
@@ -379,6 +395,7 @@ def run_eye_tracking():
                 continue
 
             frame = cv2.flip(frame, 1)
+            frame = apply_clahe(frame)
             landmarks = detect_landmarks(frame)
 
             canvas = np.zeros(
@@ -478,6 +495,7 @@ def run_eye_tracking():
     prev_x = screen_w // 2
     prev_y = screen_h // 2
     click_cooldown_counter = 0
+    blink_frame_counter = 0
 
     while True:
         success, frame = cam.read()
@@ -486,6 +504,7 @@ def run_eye_tracking():
             break
 
         frame = cv2.flip(frame, 1)
+        frame = apply_clahe(frame)
         landmarks = detect_landmarks(frame)
 
         if landmarks:
@@ -523,20 +542,26 @@ def run_eye_tracking():
 
             if click_cooldown_counter > 0:
                 click_cooldown_counter -= 1
+                blink_frame_counter = 0
 
             elif left_ear < BLINK_THRESHOLD:
-                pyautogui.click()
-                click_cooldown_counter = CLICK_COOLDOWN
+                blink_frame_counter += 1
 
-                cv2.putText(
-                    frame,
-                    "CLICK",
-                    (30, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
-                    (0, 0, 255),
-                    2,
-                )
+                if blink_frame_counter == MIN_BLINK_FRAMES:
+                    pyautogui.click()
+                    click_cooldown_counter = CLICK_COOLDOWN
+
+                    cv2.putText(
+                        frame,
+                        "CLICK",
+                        (30, 60),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        1,
+                        (0, 0, 255),
+                        2,
+                    )
+            else:
+                blink_frame_counter = 0
 
             cv2.putText(
                 frame,
