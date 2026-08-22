@@ -37,9 +37,7 @@
 
         <div id="tracking1">
 
-            <div id="box">
-                0
-            </div>
+            <div id="fpsDisplay">0</div>
 
             <div id="tracking">
                 <span class="dot" id="statusDot">&#9679;</span>
@@ -215,7 +213,7 @@
 
     <!-- FOOTER -->
     <footer>
-        Hands-free control via webcam head tracking -- SAHAY
+        Hands-free control via webcam head tracking -- SAHAY BY (SAYAN~SAMRAT~SOUMYADEEP)
     </footer>
 
 
@@ -339,6 +337,72 @@
 function voiceClick(buttonName) {
     speak(buttonName + " clicked");
 }
+
+
+        // ============================================================
+        // AUTO-SCROLL -- so the patient never needs a mouse/keyboard
+        // to reach buttons below the fold.
+        //
+        // pyautogui.moveTo() in Eye_As_Mouse.py moves the REAL OS
+        // cursor, so the browser already receives genuine mousemove
+        // events while tracking is active. We just watch those events
+        // and scroll the page when the cursor nears the top/bottom
+        // edge of the visible window.
+        // ============================================================
+
+        const SCROLL_EDGE_ZONE = 100;   // px from top/bottom edge that triggers scrolling
+        const SCROLL_SPEED = 10;        // px moved per mousemove tick
+        const CLICK_PAUSE_MS = 1000;    // pause scrolling for a moment after a click
+
+        let scrollPaused = false;
+        let clickPauseTimer = null;
+
+        function pauseScrollBriefly(duration = CLICK_PAUSE_MS) {
+            scrollPaused = true;
+            clearTimeout(clickPauseTimer);
+            clickPauseTimer = setTimeout(() => {
+                scrollPaused = false;
+            }, duration);
+        }
+
+        document.addEventListener("mousemove", (e) => {
+
+            if (scrollPaused) return;
+
+            const y = e.clientY;
+            const viewportHeight = window.innerHeight;
+
+            if (y < SCROLL_EDGE_ZONE) {
+                // Cursor near top edge -- scroll up
+                window.scrollBy(0, -SCROLL_SPEED);
+            } else if (y > viewportHeight - SCROLL_EDGE_ZONE) {
+                // Cursor near bottom edge -- scroll down
+                window.scrollBy(0, SCROLL_SPEED);
+            }
+
+        });
+
+        // Pause auto-scroll the instant the cursor lands on a button,
+        // so the page doesn't drift away mid-selection.
+        document.querySelectorAll(".icon-div").forEach((btn) => {
+
+            btn.addEventListener("mouseenter", () => {
+                scrollPaused = true;
+                clearTimeout(clickPauseTimer);
+            });
+
+            btn.addEventListener("mouseleave", () => {
+                scrollPaused = false;
+            });
+
+            // Also hold the pause for a moment after an actual click,
+            // so a fresh blink-click isn't immediately followed by
+            // the page jumping underneath the patient.
+            btn.addEventListener("click", () => {
+                pauseScrollBriefly();
+            });
+
+        });
 
     </script>
 

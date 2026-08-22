@@ -24,6 +24,8 @@ import os
 import sys
 import subprocess
 import urllib.request
+import time
+import json
 
 from flask import Flask, render_template, jsonify
 
@@ -125,7 +127,14 @@ def status():
     return jsonify({
         "running": running
     })
-
+@app.route("/fps")
+def get_fps():
+    try:
+        with open(FPS_FILE, "r") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        data = {"fps": 0}
+    return jsonify(data)
 
 # ============================================================
 # EYE / HEAD TRACKING
