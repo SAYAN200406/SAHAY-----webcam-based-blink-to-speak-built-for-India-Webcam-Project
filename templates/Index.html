@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>SAHAY - Head-Controlled Assistive Interface</title>
+    <title>SAHAY — Head-Controlled Assistive Interface</title>
 
     <!-- Flask serves CSS from the static folder -->
     <link rel="stylesheet" href="{{ url_for('static', filename='Css.css') }}">
@@ -15,8 +15,10 @@
 
     <!-- NAV -->
     <div id="nav">
-        <img src="{{ url_for('static', filename='mods.jpg') }}" height="40">
-        <span id="nav1"></span>
+        <div id="navmark">
+            <img src="{{ url_for('static', filename='mods.jpg') }}" height="24" alt="Institution mark">
+            <span id="navproject">TEAM DRISHTI · UDAAN 2.0</span>
+        </div>
     </div>
 
 
@@ -24,16 +26,25 @@
     <header id="navber">
 
         <div id="logo">
-            SAHAY
+            <span id="logoEyebrow">GAZE-CONTROLLED COMMUNICATION</span>
+            <div id="logoRow">
+                <span id="logoMark">SAHAY</span>
+                <span id="logoMascot" aria-hidden="true">&#128064;</span>
+            </div>
         </div>
 
         <div id="tracking1">
-            <div id="fpsDisplay">0</div>
+
+            <div id="fpsDisplay" title="Frames per second">
+                <span class="telemetry-label">FPS</span>
+                <span id="fpsValue">0</span>
+            </div>
 
             <div id="tracking">
-                <span class="dot" id="statusDot">&#9679;</span>
+                <span class="dot" id="statusDot"></span>
                 <span id="statusText">Tracking inactive</span>
             </div>
+
         </div>
 
     </header>
@@ -41,8 +52,8 @@
 
     <!-- TRACKING CONTROLS -->
     <div id="controls">
-        <button id="start">START TRACKING</button>
-        <button id="stop">STOP TRACKING</button>
+        <button id="start"><span>▶</span> Start tracking</button>
+        <button id="stop"><span>■</span> Stop tracking</button>
     </div>
 
 
@@ -50,9 +61,8 @@
     <main id="container">
 
         <div id="board">
-            <b>COMMUNICATION BOARD</b>
-            <span id="dot">.</span>
-            <span>look at a button and hold your gaze to select</span>
+            <b>Communication board</b>
+            <span>Look at a button and blink to select</span>
         </div>
 
 
@@ -61,63 +71,90 @@
             <!-- YES -->
             <button class="icon-div" id="first" onclick="voiceClick('YES')">
                 <div id="icon1">&#10004;</div>
-                <div id="text"><p>YES</p></div>
+                <div class="text">
+                    <p>YES</p>
+                    <span class="subtitle">Confirm choice</span>
+                </div>
             </button>
 
 
             <!-- NO -->
             <button class="icon-div" id="second" onclick="voiceClick('NO')">
                 <div id="icon1">&#10060;</div>
-                <div id="text"><p>NO</p></div>
+                <div class="text">
+                    <p>NO</p>
+                    <span class="subtitle">Reject choice</span>
+                </div>
             </button>
 
 
             <!-- WATER -->
             <button class="icon-div" id="theird" onclick="voiceClick('WATER')">
                 <div id="icon1">&#x1F4A7;</div>
-                <div id="text"><p>I NEED WATER</p></div>
+                <div class="text">
+                    <p>I NEED WATER</p>
+                    <span class="subtitle">Request water</span>
+                </div>
             </button>
 
 
             <!-- BATHROOM -->
             <button class="icon-div" id="forth" onclick="voiceClick('BATHROOM')">
                 <div id="icon1">&#x1F6BD;</div>
-                <div id="text"><p>BATHROOM / TOILET</p></div>
+                <div class="text">
+                    <p>BATHROOM / TOILET</p>
+                    <span class="subtitle">Request bathroom</span>
+                </div>
             </button>
 
 
             <!-- FOOD -->
             <button class="icon-div" id="fifth" onclick="voiceClick('FOOD')">
                 <div id="icon1">&#127860;</div>
-                <div id="text"><p>I NEED FOOD</p></div>
+                <div class="text">
+                    <p>I NEED FOOD</p>
+                    <span class="subtitle">Request food</span>
+                </div>
             </button>
 
 
             <!-- REPOSITION -->
             <button class="icon-div" id="six" onclick="voiceClick('REPOSITION')">
                 <div id="icon1"><b>&#8634;</b></div>
-                <div id="text"><p>REPOSITION ME</p></div>
+                <div class="text">
+                    <p>REPOSITION ME</p>
+                    <span class="subtitle">Ask to be repositioned</span>
+                </div>
             </button>
 
 
             <!-- HELP -->
             <button class="icon-div" id="seventh" onclick="voiceClick('HELP')">
                 <div id="icon1">&#x270B;</div>
-                <div id="text"><p>I NEED HELP</p></div>
+                <div class="text">
+                    <p>I NEED HELP</p>
+                    <span class="subtitle">Request assistance</span>
+                </div>
             </button>
 
 
             <!-- CAREGIVER -->
             <button class="icon-div" id="eight" onclick="voiceClick('CAREGIVER')">
                 <div id="icon1">&#128222;</div>
-                <div id="text"><p>CALL CAREGIVER</p></div>
+                <div class="text">
+                    <p>CALL CAREGIVER</p>
+                    <span class="subtitle">Alert caregiver</span>
+                </div>
             </button>
 
 
             <!-- EMERGENCY CARD -->
-            <button class="icon-div" id="nine" onclick="handleEmergencyClick()">
+            <button class="icon-div emergency" id="nine" onclick="handleEmergencyClick()">
                 <div id="icon1">&#9888;</div>
-                <div id="text"><p>EMERGENCY</p></div>
+                <div class="text">
+                    <p>EMERGENCY</p>
+                    <span class="subtitle">Send urgent alert</span>
+                </div>
             </button>
 
         </section>
@@ -127,7 +164,8 @@
 
     <!-- FOOTER -->
     <footer>
-        Hands-free control via webcam head tracking -- SAHAY BY (SAYAN~SAMRAT~SOUMYADEEP)
+        <span>Hands-free control via webcam head tracking</span>
+        <span id="footerCredit">SAHAY · SAYAN &middot; SAMRAT &middot; SOUMYADEEP</span>
     </footer>
 
 
@@ -138,23 +176,36 @@
 
         const statusText = document.getElementById("statusText");
         const statusDot = document.getElementById("statusDot");
+        const trackingPill = document.getElementById("tracking");
+
+
+        function setTrackingState(state) {
+            // state: "active" | "inactive" | "pending"
+            trackingPill.classList.remove("is-active", "is-inactive", "is-pending");
+            trackingPill.classList.add(
+                state === "active" ? "is-active" : state === "pending" ? "is-pending" : "is-inactive"
+            );
+        }
 
 
         // START TRACKING
         startButton.addEventListener("click", async () => {
             try {
                 statusText.textContent = "Starting...";
+                setTrackingState("pending");
                 const response = await fetch("/start", { method: "POST" });
                 const data = await response.json();
                 statusText.textContent = data.message;
 
                 if (data.status === "started" || data.status === "already_running") {
-                    statusDot.style.color = "green";
+                    setTrackingState("active");
+                } else {
+                    setTrackingState("inactive");
                 }
             } catch (error) {
                 console.error(error);
                 statusText.textContent = "Unable to start tracking";
-                statusDot.style.color = "red";
+                setTrackingState("inactive");
             }
         });
 
@@ -165,7 +216,7 @@
                 const response = await fetch("/stop", { method: "POST" });
                 const data = await response.json();
                 statusText.textContent = data.message;
-                statusDot.style.color = "red";
+                setTrackingState("inactive");
             } catch (error) {
                 console.error(error);
                 statusText.textContent = "Unable to stop tracking";
@@ -181,10 +232,10 @@
 
                 if (data.running) {
                     statusText.textContent = "Tracking active";
-                    statusDot.style.color = "green";
+                    setTrackingState("active");
                 } else {
                     statusText.textContent = "Tracking inactive";
-                    statusDot.style.color = "red";
+                    setTrackingState("inactive");
                 }
             } catch (error) {
                 console.error(error);
@@ -229,7 +280,7 @@
         // AUTO-SCROLL LOGIC
         // ============================================================
         const SCROLL_EDGE_ZONE = 120;   // px from top/bottom edge where scrolling begins
-        const MAX_SCROLL_SPEED = 14;    // px per animation frame at edge
+        const MAX_SCROLL_SPEED = 120;    // px per animation frame at edge
         const CLICK_PAUSE_MS = 1000;    // pause scrolling after a click
 
         let scrollPaused = false;
@@ -278,8 +329,36 @@
 
             btn.addEventListener("click", () => {
                 pauseScrollBriefly();
+
+                // Selection confirmation pulse — visual feedback that a
+                // gaze + blink selection actually registered.
+                btn.classList.remove("just-selected");
+                // force reflow so the animation restarts on repeat clicks
+                void btn.offsetWidth;
+                btn.classList.add("just-selected");
+                setTimeout(() => btn.classList.remove("just-selected"), 650);
             });
         });
+
+
+        // ============================================================
+        // FPS POLLING (reads the same bridge the backend already exposes)
+        // ============================================================
+        const fpsValueEl = document.getElementById("fpsValue");
+
+        async function pollFps() {
+            try {
+                const response = await fetch("/fps");
+                const data = await response.json();
+                if (typeof data.fps !== "undefined") {
+                    fpsValueEl.textContent = Math.round(data.fps);
+                }
+            } catch (error) {
+                // Silent — FPS is a nice-to-have readout, not critical path.
+            }
+        }
+
+        setInterval(pollFps, 1000);
     </script>
 
 </body>
