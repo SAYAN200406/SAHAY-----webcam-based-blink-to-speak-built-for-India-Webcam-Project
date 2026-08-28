@@ -4,20 +4,11 @@ SAHAY - Head/Eye Controlled Assistive Interface
 Flask bridge for the existing MediaPipe + OpenCV + PyAutoGUI tracker.
 
 Run:
-    pip install flask opencv-python mediapipe pyautogui numpy
+    pip install flask opencv-python mediapipe pyautogui numpy twilio psutil
     python Eye_As_Mouse.py
 
 Then open:
     http://127.0.0.1:5000
-
-The browser UI is served by Flask. Clicking the START button should POST
-to /start from Index.html. The actual tracking runs as a separate Python
-process so OpenCV's webcam/window handling does not block Flask.
-
-Controls:
-    - Calibration: look at each red dot and press SPACE
-    - Tracking: blink the LEFT eye to click
-    - Tracking window: press 'q' to quit
 """
 
 import os
@@ -26,6 +17,13 @@ import subprocess
 import urllib.request
 import time
 import json
+import threading
+
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
 
 from flask import Flask, render_template, jsonify
 
@@ -36,6 +34,76 @@ import pyautogui
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision as mp_vision
 
+# Optional Twilio Import
+try:
+    from twilio.rest import Client
+    TWILIO_AVAILABLE = True
+except ImportError:
+    TWILIO_AVAILABLE = False
+
+# ============================================================
+# TWILIO & EMERGENCY CREDENTIALS
+# ============================================================
+from dotenv import load_dotenv
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Explicitly load .env from the SAHAY project folder
+ENV_PATH = os.path.join(BASE_DIR, ".env")
+load_dotenv(dotenv_path=ENV_PATH)
+
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
+CAREGIVER_PHONE_NUMBER = os.getenv("CAREGIVER_PHONE_NUMBER")
+
+def send_caregiver_alert(reason="Manual Emergency Button Pressed"):
+    """
+    Sends an SMS alert via Twilio.
+    """
+
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    alert_msg = (
+        f"🚨 SAHAY EMERGENCY ALERT [{timestamp}]: "
+        f"{reason}. Please check on the patient immediately!"
+    )
+
+    print(f"\n[EMERGENCY TRIGGERED]: {alert_msg}\n")
+
+    # Check credentials
+    if not all([
+        TWILIO_AVAILABLE,
+        TWILIO_ACCOUNT_SID,
+        TWILIO_AUTH_TOKEN,
+        TWILIO_PHONE_NUMBER,
+        CAREGIVER_PHONE_NUMBER
+    ]):
+        print("[Twilio ERROR] Missing Twilio configuration.")
+        return False, "Twilio configuration is missing."
+
+    try:
+        # Create Twilio client
+        client = Client(
+            TWILIO_ACCOUNT_SID,
+            TWILIO_AUTH_TOKEN
+        )
+
+        # Send SMS
+        message = client.messages.create(
+            body=alert_msg,
+            from_=TWILIO_PHONE_NUMBER,
+            to=CAREGIVER_PHONE_NUMBER
+        )
+
+        print(f"[Twilio SUCCESS] SMS Sent! SID: {message.sid}")
+
+        return True, "Caregiver alerted via SMS."
+
+    except Exception as e:
+        print(f"[Twilio ERROR] Failed to send SMS: {e}")
+
+        return False, f"Failed to send SMS: {str(e)}"
 
 # ============================================================
 # PATHS / CONFIG
@@ -49,16 +117,17 @@ MODEL_URL = (
     "face_landmarker/float16/1/face_landmarker.task"
 )
 
+FPS_FILE = os.path.join(BASE_DIR, "fps_status.json")
+
 SMOOTHING = 5
 BLINK_THRESHOLD = 0.21
 CLICK_COOLDOWN = 5
-MIN_BLINK_FRAMES = 6  # frames eye must stay closed before it counts as intentional
 CAM_INDEX = 0
 CALIB_SAMPLES = 20
 CALIB_MARGIN = 0.08
-CLAHE_BRIGHTNESS_THRESHOLD = 120  # only apply CLAHE below this mean brightness
 
-clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+# Inactivity / Emergency Config
+NO_RESPONSE_TIMEOUT = 30  # Seconds without face detection before alert
 
 
 # ============================================================
@@ -90,7 +159,7 @@ def start_tracking():
         })
 
     tracking_process = subprocess.Popen(
-        [sys.executable, os.path.abspath(__file__), "--track"],
+        ["py", os.path.abspath(__file__), "--track"],
         cwd=BASE_DIR,
     )
 
@@ -105,9 +174,26 @@ def stop_tracking():
     global tracking_process
 
     if tracking_process is not None and tracking_process.poll() is None:
-        tracking_process.terminate()
+        if PSUTIL_AVAILABLE:
+            try:
+                parent = psutil.Process(tracking_process.pid)
+                for child in parent.children(recursive=True):
+                    child.kill()
+                parent.kill()
+            except Exception:
+                tracking_process.terminate()
+        else:
+            tracking_process.terminate()
+
         tracking_process.wait(timeout=3)
         tracking_process = None
+
+        try:
+            with open(FPS_FILE, "w") as f:
+                json.dump({"fps": 0}, f)
+        except Exception:
+            pass
+
         return jsonify({
             "status": "stopped",
             "message": "Eye tracking stopped."
@@ -116,6 +202,22 @@ def stop_tracking():
     return jsonify({
         "status": "not_running",
         "message": "Eye tracking is not running."
+    })
+
+
+@app.route("/emergency", methods=["POST"])
+def trigger_emergency():
+    """Manual Emergency route triggered by frontend button."""
+    # Runs in a separate thread so UI does not wait for HTTP SMS network response
+    sms_thread = threading.Thread(
+        target=send_caregiver_alert, 
+        kwargs={"reason": "Patient pressed the emergency button"}
+    )
+    sms_thread.start()
+
+    return jsonify({
+        "status": "success",
+        "message": "🚨 Emergency alert sent to caregiver!"
     })
 
 
@@ -131,14 +233,20 @@ def status():
     return jsonify({
         "running": running
     })
+
+
 @app.route("/fps")
 def get_fps():
+    if not os.path.exists(FPS_FILE):
+        return jsonify({"fps": 0})
     try:
         with open(FPS_FILE, "r") as f:
-            data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+            content = f.read().strip()
+            data = json.loads(content) if content else {"fps": 0}
+    except Exception:
         data = {"fps": 0}
     return jsonify(data)
+
 
 # ============================================================
 # EYE / HEAD TRACKING
@@ -163,36 +271,18 @@ def eye_aspect_ratio(landmarks, top_idx, bottom_idx, left_idx, right_idx):
     return vertical / horizontal if horizontal else 1.0
 
 
-def apply_clahe(frame_bgr):
-    """Boost contrast in low light so MediaPipe locks onto landmarks reliably."""
-    gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
-    if gray.mean() > CLAHE_BRIGHTNESS_THRESHOLD:
-        return frame_bgr  # scene already bright enough, skip processing
-
-    lab = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
-    l = clahe.apply(l)
-    return cv2.cvtColor(cv2.merge((l, a, b)), cv2.COLOR_LAB2BGR)
-
-
 def get_gaze_raw(landmarks):
-    """
-    Uses the nose tip as the main head-position tracking point.
-    This is intentionally kept from the original SAHAY implementation.
-    """
     NOSE_TIP = 1
     nose = landmarks[NOSE_TIP]
     return nose.x, nose.y
 
 
 def draw_eye_cage(frame, landmarks):
-    """Draw the head tracking cage and left-eye blink reference box."""
     h, w, _ = frame.shape
 
     def to_px(landmark):
         return int(landmark.x * w), int(landmark.y * h)
 
-    # Main head tracking point
     NOSE_TIP = 1
     nose_px = to_px(landmarks[NOSE_TIP])
 
@@ -235,7 +325,6 @@ def draw_eye_cage(frame, landmarks):
         1,
     )
 
-    # Left eye box used for blink detection
     LEFT_EYE_LEFT = 33
     LEFT_EYE_RIGHT = 133
     LEFT_EYE_TOP = 159
@@ -261,22 +350,17 @@ def draw_eye_cage(frame, landmarks):
 
 
 def run_eye_tracking():
-    """Run the original calibration + tracking workflow."""
+    """Run calibration + tracking workflow with continuous safety checks."""
 
-    # ---------- DOWNLOAD MODEL IF MISSING ----------
     if not os.path.exists(MODEL_PATH):
         print("Downloading face landmark model (one-time, ~5MB)...")
         urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
         print("Done.")
 
-    # ---------- SETUP ----------
     screen_w, screen_h = pyautogui.size()
     pyautogui.FAILSAFE = False
 
-    base_options = mp_python.BaseOptions(
-        model_asset_path=MODEL_PATH
-    )
-
+    base_options = mp_python.BaseOptions(model_asset_path=MODEL_PATH)
     options = mp_vision.FaceLandmarkerOptions(
         base_options=base_options,
         running_mode=mp_vision.RunningMode.VIDEO,
@@ -286,7 +370,6 @@ def run_eye_tracking():
     )
 
     landmarker = mp_vision.FaceLandmarker.create_from_options(options)
-
     cam = cv2.VideoCapture(CAM_INDEX)
 
     if not cam.isOpened():
@@ -294,12 +377,10 @@ def run_eye_tracking():
         landmarker.close()
         return
 
-    # Face landmark indices
     LEFT_EYE_TOP = 159
     LEFT_EYE_BOTTOM = 145
     LEFT_EYE_LEFT = 33
     LEFT_EYE_RIGHT = 133
-    NOSE_TIP = 1
 
     frame_timestamp_ms = 0
 
@@ -313,15 +394,10 @@ def run_eye_tracking():
         )
 
         frame_timestamp_ms += 33
-
-        result = landmarker.detect_for_video(
-            mp_image,
-            frame_timestamp_ms,
-        )
+        result = landmarker.detect_for_video(mp_image, frame_timestamp_ms)
 
         if result.face_landmarks:
             return result.face_landmarks[0]
-
         return None
 
     # ---------- CALIBRATION ----------
@@ -347,19 +423,9 @@ def run_eye_tracking():
         py = int(fy * screen_h)
 
         while True:
-            canvas = np.zeros(
-                (screen_h, screen_w, 3),
-                dtype=np.uint8,
-            )
+            canvas = np.zeros((screen_h, screen_w, 3), dtype=np.uint8)
 
-            cv2.circle(
-                canvas,
-                (px, py),
-                25,
-                (0, 0, 255),
-                -1,
-            )
-
+            cv2.circle(canvas, (px, py), 25, (0, 0, 255), -1)
             cv2.putText(
                 canvas,
                 f"Look at {label} - press SPACE",
@@ -371,12 +437,10 @@ def run_eye_tracking():
             )
 
             cv2.imshow(calib_window, canvas)
-
             key = cv2.waitKey(1) & 0xFF
 
             if key == 32:
                 break
-
             if key == ord("q"):
                 cam.release()
                 landmarker.close()
@@ -390,27 +454,14 @@ def run_eye_tracking():
 
         while len(samples_x) < CALIB_SAMPLES:
             success, frame = cam.read()
-
             if not success:
                 continue
 
             frame = cv2.flip(frame, 1)
-            frame = apply_clahe(frame)
             landmarks = detect_landmarks(frame)
 
-            canvas = np.zeros(
-                (screen_h, screen_w, 3),
-                dtype=np.uint8,
-            )
-
-            cv2.circle(
-                canvas,
-                (px, py),
-                25,
-                (0, 255, 0),
-                -1,
-            )
-
+            canvas = np.zeros((screen_h, screen_w, 3), dtype=np.uint8)
+            cv2.circle(canvas, (px, py), 25, (0, 255, 0), -1)
             cv2.putText(
                 canvas,
                 "Hold steady, capturing...",
@@ -422,15 +473,10 @@ def run_eye_tracking():
             )
 
             cv2.imshow(calib_window, canvas)
-
             if landmarks:
                 draw_eye_cage(frame, landmarks)
 
-            cv2.imshow(
-                "Webcam (SAHAY tracking preview)",
-                frame,
-            )
-
+            cv2.imshow("Webcam (SAHAY tracking preview)", frame)
             cv2.waitKey(1)
 
             if landmarks:
@@ -445,92 +491,68 @@ def run_eye_tracking():
 
     cv2.destroyWindow(calib_window)
 
-    # ---------- BUILD CALIBRATION BOUNDS ----------
-    left_x = (
-        collected["TOP-LEFT"][0] +
-        collected["BOTTOM-LEFT"][0]
-    ) / 2
-
-    right_x = (
-        collected["TOP-RIGHT"][0] +
-        collected["BOTTOM-RIGHT"][0]
-    ) / 2
-
-    top_y = (
-        collected["TOP-LEFT"][1] +
-        collected["TOP-RIGHT"][1]
-    ) / 2
-
-    bottom_y = (
-        collected["BOTTOM-LEFT"][1] +
-        collected["BOTTOM-RIGHT"][1]
-    ) / 2
-
-    print(
-        f"Calibration done. x range: "
-        f"{left_x:.3f} -> {right_x:.3f}, "
-        f"y range: {top_y:.3f} -> {bottom_y:.3f}"
-    )
+    # ---------- BOUNDS & MAPPING ----------
+    left_x = (collected["TOP-LEFT"][0] + collected["BOTTOM-LEFT"][0]) / 2
+    right_x = (collected["TOP-RIGHT"][0] + collected["BOTTOM-RIGHT"][0]) / 2
+    top_y = (collected["TOP-LEFT"][1] + collected["TOP-RIGHT"][1]) / 2
+    bottom_y = (collected["BOTTOM-LEFT"][1] + collected["BOTTOM-RIGHT"][1]) / 2
 
     def map_to_screen(rel_x, rel_y):
-        norm_x = (
-            (rel_x - left_x) /
-            (right_x - left_x + 1e-6)
-        )
-
-        norm_y = (
-            (rel_y - top_y) /
-            (bottom_y - top_y + 1e-6)
-        )
+        norm_x = (rel_x - left_x) / (right_x - left_x + 1e-6)
+        norm_y = (rel_y - top_y) / (bottom_y - top_y + 1e-6)
 
         tx = int(norm_x * screen_w)
         ty = int(norm_y * screen_h)
 
-        tx = max(0, min(screen_w - 1, tx))
-        ty = max(0, min(screen_h - 1, ty))
+        return max(0, min(screen_w - 1, tx)), max(0, min(screen_h - 1, ty))
 
-        return tx, ty
-
-    # ---------- MAIN TRACKING LOOP ----------
-    prev_x = screen_w // 2
-    prev_y = screen_h // 2
+    # ---------- TRACKING LOOP WITH NO-RESPONSE SAFETY ----------
+    prev_x, prev_y = screen_w // 2, screen_h // 2
     click_cooldown_counter = 0
-    blink_frame_counter = 0
+
+    fps_last_time = time.time()
+    fps_frame_count = 0
+
+    # Inactivity Tracking
+    last_face_detected_time = time.time()
+    no_response_alert_sent = False
 
     while True:
         success, frame = cam.read()
-
         if not success:
             break
 
+        fps_frame_count += 1
+        fps_now = time.time()
+        fps_elapsed = fps_now - fps_last_time
+
+        if fps_elapsed >= 1.0:
+            current_fps = round(fps_frame_count / fps_elapsed)
+            fps_frame_count = 0
+            fps_last_time = fps_now
+            try:
+                with open(FPS_FILE, "w") as f:
+                    json.dump({"fps": current_fps}, f)
+            except Exception:
+                pass
+
         frame = cv2.flip(frame, 1)
-        frame = apply_clahe(frame)
         landmarks = detect_landmarks(frame)
 
         if landmarks:
+            # Reset inactivity timer whenever face is seen
+            last_face_detected_time = time.time()
+            no_response_alert_sent = False
+
             draw_eye_cage(frame, landmarks)
-
             rel_x, rel_y = get_gaze_raw(landmarks)
+            target_x, target_y = map_to_screen(rel_x, rel_y)
 
-            target_x, target_y = map_to_screen(
-                rel_x,
-                rel_y,
-            )
-
-            cur_x = (
-                prev_x +
-                (target_x - prev_x) // SMOOTHING
-            )
-
-            cur_y = (
-                prev_y +
-                (target_y - prev_y) // SMOOTHING
-            )
+            cur_x = prev_x + (target_x - prev_x) // SMOOTHING
+            cur_y = prev_y + (target_y - prev_y) // SMOOTHING
 
             pyautogui.moveTo(cur_x, cur_y)
-
-            prev_x = cur_x
-            prev_y = cur_y
+            prev_x, prev_y = cur_x, cur_y
 
             left_ear = eye_aspect_ratio(
                 landmarks,
@@ -542,41 +564,42 @@ def run_eye_tracking():
 
             if click_cooldown_counter > 0:
                 click_cooldown_counter -= 1
-                blink_frame_counter = 0
-
             elif left_ear < BLINK_THRESHOLD:
-                blink_frame_counter += 1
-
-                if blink_frame_counter == MIN_BLINK_FRAMES:
-                    pyautogui.click()
-                    click_cooldown_counter = CLICK_COOLDOWN
-
-                    cv2.putText(
-                        frame,
-                        "CLICK",
-                        (30, 60),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1,
-                        (0, 0, 255),
-                        2,
-                    )
-            else:
-                blink_frame_counter = 0
+                pyautogui.click()
+                click_cooldown_counter = CLICK_COOLDOWN
+                cv2.putText(
+                    frame, "CLICK", (30, 60),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2
+                )
 
             cv2.putText(
-                frame,
-                f"EAR: {left_ear:.2f}",
-                (30, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 255, 0),
-                2,
+                frame, f"EAR: {left_ear:.2f}", (30, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2
             )
 
-        cv2.imshow(
-            "SAHAY Eye Mouse - press q to quit",
-            frame,
-        )
+        else:
+            # Handle No Face Detected / Patient Inactivity
+            inactive_seconds = time.time() - last_face_detected_time
+
+            if inactive_seconds > 5:
+                cv2.putText(
+                    frame,
+                    f"NO USER DETECTED ({int(inactive_seconds)}s)",
+                    (30, 60),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 0, 255),
+                    2,
+                )
+
+            # Trigger automatic caregiver alert after 30 continuous seconds of no detection
+            if inactive_seconds >= NO_RESPONSE_TIMEOUT and not no_response_alert_sent:
+                send_caregiver_alert(
+                    reason=f"No user detected for {NO_RESPONSE_TIMEOUT} seconds"
+                )
+                no_response_alert_sent = True
+
+        cv2.imshow("SAHAY Eye Mouse - press q to quit", frame)
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
@@ -584,6 +607,12 @@ def run_eye_tracking():
     cam.release()
     landmarker.close()
     cv2.destroyAllWindows()
+
+    try:
+        with open(FPS_FILE, "w") as f:
+            json.dump({"fps": 0}, f)
+    except Exception:
+        pass
 
 
 # ============================================================
@@ -594,8 +623,6 @@ if __name__ == "__main__":
     if "--track" in sys.argv:
         run_eye_tracking()
     else:
-        # debug=False is intentional: Flask's reloader would create
-        # another process and can cause duplicate tracking processes.
         app.run(
             host="127.0.0.1",
             port=5000,

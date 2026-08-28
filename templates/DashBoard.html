@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SAHAY — Ward Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-deep:#131B33;
+    --navy-mid:#1F2E52;
+    --blue-accent:#3D6FE0;
+    --bg:#EDF0F6;
+    --card-bg:#FFFFFF;
+    --urgent:#D6483F;
+    --urgent-bg:#FDEDEC;
+    --urgent-ring:#D6483F;
+    --attention:#C97A1E;
+    --attention-bg:#FCF2E3;
+    --attention-ring:#E2963A;
+    --calm:#1F8F5F;
+    --calm-bg:#E9F7F0;
+    --calm-ring:#2F9E6E;
+    --offline:#6B7280;
+    --offline-bg:#EEF0F3;
+    --offline-ring:#B0B6C0;
+    --text:#16192A;
+    --text-muted:#667085;
+    --border:#E2E6ED;
+    --shadow: 0 1px 2px rgba(19,27,51,0.04), 0 4px 14px rgba(19,27,51,0.06);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    font-family:'IBM Plex Sans', sans-serif;
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+
+  /* ===== Top bar ===== */
+  .topbar{
+    background:var(--navy-deep);
+    color:#fff;
+    padding:18px 28px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:14px;
+  }
+  .topbar-left{ display:flex; align-items:center; gap:14px; }
+  .logo{
+    width:36px; height:36px;
+    border-radius:9px;
+    background:linear-gradient(155deg, var(--blue-accent), #7BA0F2);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:15px; letter-spacing:0.5px;
+    flex-shrink:0;
+  }
+  .titles h1{ margin:0; font-size:17px; font-weight:600; letter-spacing:0.1px;}
+  .titles p{ margin:2px 0 0; font-size:12.5px; color:#A9B3CC; }
+  .topbar-right{ display:flex; align-items:center; gap:22px; }
+  .clock{ font-size:13px; color:#C4CCE2; }
+  .clock b{ color:#fff; font-weight:600; }
+
+  .stat-chips{
+    display:flex; gap:10px; padding:14px 28px 0;
+    flex-wrap:wrap;
+  }
+  .chip{
+    background:var(--card-bg);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:12px 18px;
+    min-width:130px;
+    box-shadow:var(--shadow);
+  }
+  .chip .num{ font-size:22px; font-weight:700; font-family:'IBM Plex Mono', monospace; line-height:1;}
+  .chip .lbl{ font-size:11.5px; color:var(--text-muted); margin-top:6px; text-transform:uppercase; letter-spacing:0.6px;}
+  .chip.urgent .num{ color:var(--urgent);}
+  .chip.attention .num{ color:var(--attention);}
+  .chip.calm .num{ color:var(--calm);}
+  .chip.avg .num{ color:var(--navy-mid); }
+
+  /* ===== Filter tabs ===== */
+  .filters{
+    display:flex; gap:8px; padding:18px 28px 4px;
+    flex-wrap:wrap;
+  }
+  .tab{
+    border:1px solid var(--border);
+    background:var(--card-bg);
+    color:var(--text-muted);
+    font-family:inherit;
+    font-size:13px;
+    font-weight:500;
+    padding:8px 15px;
+    border-radius:20px;
+    cursor:pointer;
+    transition:all .15s ease;
+    display:flex; align-items:center; gap:7px;
+  }
+  .tab:hover{ border-color:var(--blue-accent); color:var(--navy-deep); }
+  .tab.active{
+    background:var(--navy-deep);
+    border-color:var(--navy-deep);
+    color:#fff;
+  }
+  .tab .dot{ width:7px; height:7px; border-radius:50%; }
+  .dot.urgent{ background:var(--urgent);}
+  .dot.attention{ background:var(--attention);}
+  .dot.calm{ background:var(--calm);}
+  .dot.offline{ background:var(--offline);}
+
+  /* ===== Grid ===== */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(272px, 1fr));
+    gap:16px;
+    padding:18px 28px 40px;
+  }
+
+  .card{
+    background:var(--card-bg);
+    border-radius:16px;
+    border:1px solid var(--border);
+    box-shadow:var(--shadow);
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    transition: transform .15s ease, box-shadow .15s ease;
+    position:relative;
+    overflow:hidden;
+  }
+  .card::before{
+    content:"";
+    position:absolute; left:0; top:0; bottom:0; width:4px;
+  }
+  .card.state-urgent::before{ background:var(--urgent); }
+  .card.state-attention::before{ background:var(--attention); }
+  .card.state-calm::before{ background:var(--calm); }
+  .card.state-offline::before{ background:var(--offline); }
+
+  .card.state-urgent{ animation: pulseCard 2.2s ease-in-out infinite; }
+  @keyframes pulseCard{
+    0%,100%{ box-shadow:var(--shadow); }
+    50%{ box-shadow:0 1px 2px rgba(214,72,63,0.10), 0 6px 20px rgba(214,72,63,0.18); }
+  }
+
+  .card-head{
+    display:flex; justify-content:space-between; align-items:flex-start;
+  }
+  .bed-id{ font-size:15px; font-weight:600; }
+  .patient-sub{ font-size:12px; color:var(--text-muted); margin-top:2px; }
+
+  /* signal ring gauge */
+  .ring-wrap{ position:relative; width:52px; height:52px; flex-shrink:0; }
+  .ring-wrap svg{ transform:rotate(-90deg); }
+  .ring-bg{ fill:none; stroke:var(--border); stroke-width:5; }
+  .ring-fg{ fill:none; stroke-width:5; stroke-linecap:round; transition:stroke-dashoffset .3s ease; }
+  .ring-pct{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono', monospace; font-size:11px; font-weight:600;
+  }
+
+  .state-urgent .ring-fg{ stroke:var(--urgent-ring); }
+  .state-attention .ring-fg{ stroke:var(--attention-ring); }
+  .state-calm .ring-fg{ stroke:var(--calm-ring); }
+  .state-offline .ring-fg{ stroke:var(--offline-ring); }
+
+  .pill{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;
+    padding:4px 10px; border-radius:20px; width:fit-content;
+  }
+  .state-urgent .pill{ background:var(--urgent-bg); color:var(--urgent); }
+  .state-attention .pill{ background:var(--attention-bg); color:var(--attention); }
+  .state-calm .pill{ background:var(--calm-bg); color:var(--calm); }
+  .state-offline .pill{ background:var(--offline-bg); color:var(--offline); }
+  .pill .dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+  .request-box{
+    background:var(--bg);
+    border-radius:10px;
+    padding:10px 12px;
+    font-size:13.5px;
+    display:flex; align-items:center; gap:9px;
+    color:var(--text);
+    min-height:20px;
+  }
+  .request-box .req-icon{ font-size:15px; }
+  .request-box.empty{ color:var(--text-muted); font-style:italic; font-size:12.5px; }
+
+  .meta-row{
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:11.5px; color:var(--text-muted);
+  }
+  .meta-row .time-ago{ font-family:'IBM Plex Mono', monospace; font-weight:600; color:var(--text); }
+
+  .card-footer{ display:flex; gap:8px; margin-top:2px; }
+  .btn{
+    flex:1;
+    border:none; border-radius:9px;
+    padding:9px 10px;
+    font-family:inherit; font-size:12.5px; font-weight:600;
+    cursor:pointer;
+    transition:opacity .15s ease, transform .1s ease;
+  }
+  .btn:active{ transform:scale(0.97); }
+  .btn-ack{ background:var(--navy-deep); color:#fff; }
+  .btn-ack:hover{ opacity:0.88; }
+  .btn-ack:disabled{ background:var(--border); color:var(--text-muted); cursor:default; }
+  .btn-ghost{
+    background:none; border:1px solid var(--border); color:var(--text-muted);
+    flex:0 0 auto; width:38px; display:flex; align-items:center; justify-content:center;
+  }
+  .btn-ghost:hover{ border-color:var(--blue-accent); color:var(--navy-deep); }
+
+  .empty-state{
+    grid-column:1 / -1;
+    text-align:center;
+    padding:60px 20px;
+    color:var(--text-muted);
+  }
+  .empty-state .big{ font-size:34px; margin-bottom:8px; }
+
+  footer{
+    text-align:center; font-size:11.5px; color:var(--text-muted);
+    padding:0 28px 26px;
+  }
+
+  @media (max-width:520px){
+    .topbar{ padding:14px 16px; }
+    .stat-chips, .filters, .grid{ padding-left:16px; padding-right:16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo">S</div>
+    <div class="titles">
+      <h1>SAHAY Ward Console</h1>
+      <p>Ward B · Neuro Rehabilitation · 8 beds monitored</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="clock">Shift started <b>07:00</b> · <span id="liveClock" class="mono">--:--:--</span></div>
+  </div>
+</div>
+
+<div class="stat-chips">
+  <div class="chip urgent"><div class="num" id="countUrgent">0</div><div class="lbl">Urgent</div></div>
+  <div class="chip attention"><div class="num" id="countAttention">0</div><div class="lbl">Needs attention</div></div>
+  <div class="chip calm"><div class="num" id="countCalm">0</div><div class="lbl">Calm</div></div>
+  <div class="chip avg"><div class="num">41s</div><div class="lbl">Avg response</div></div>
+</div>
+
+<div class="filters" id="filters">
+  <button class="tab active" data-filter="all">All beds</button>
+  <button class="tab" data-filter="urgent"><span class="dot urgent"></span>Urgent</button>
+  <button class="tab" data-filter="attention"><span class="dot attention"></span>Attention</button>
+  <button class="tab" data-filter="calm"><span class="dot calm"></span>Calm</button>
+  <button class="tab" data-filter="offline"><span class="dot offline"></span>Offline</button>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<footer>SAHAY connects to each bedside webcam and reads head movement and blink pattern as intent · Tracking confidence shown per bed</footer>
+
+<script>
+const beds = [
+  { id:"04A", state:"urgent",   confidence:91, request:"Requesting: Pain relief", icon:"⚠️", ago:"3m 12s" },
+  { id:"02C", state:"urgent",   confidence:87, request:"Requesting: Nurse — repeated call", icon:"🔴", ago:"1m 40s" },
+  { id:"05B", state:"attention",confidence:78, request:"Requesting: Water", icon:"💧", ago:"2m 05s" },
+  { id:"01A", state:"attention",confidence:83, request:"Requesting: Reposition", icon:"🛏️", ago:"1m 12s" },
+  { id:"03D", state:"calm",     confidence:95, request:"Last check-in: All fine", icon:"✅", ago:"6m 40s" },
+  { id:"06A", state:"calm",     confidence:90, request:"Last check-in: Watching TV cue", icon:"✅", ago:"9m 02s" },
+  { id:"07C", state:"calm",     confidence:88, request:"Last check-in: All fine", icon:"✅", ago:"4m 55s" },
+  { id:"08B", state:"offline",  confidence:12, request:"", icon:"", ago:"18m 20s" },
+];
+
+const stateLabel = { urgent:"Urgent", attention:"Needs attention", calm:"Calm", offline:"Camera offline" };
+const grid = document.getElementById("grid");
+let currentFilter = "all";
+
+function ringSvg(pct, state){
+  const r = 21, c = 2*Math.PI*r;
+  const offset = c - (pct/100)*c;
+  return `
+    <div class="ring-wrap">
+      <svg width="52" height="52" viewBox="0 0 52 52">
+        <circle class="ring-bg" cx="26" cy="26" r="${r}"></circle>
+        <circle class="ring-fg" cx="26" cy="26" r="${r}" stroke-dasharray="${c}" stroke-dashoffset="${offset}"></circle>
+      </svg>
+      <div class="ring-pct">${state==='offline' ? '--' : pct+'%'}</div>
+    </div>`;
+}
+
+function cardHtml(bed){
+  const showAck = bed.state === 'urgent' || bed.state === 'attention';
+  const reqBox = bed.state === 'offline'
+    ? `<div class="request-box empty">No signal — check camera / lighting</div>`
+    : `<div class="request-box"><span class="req-icon">${bed.icon}</span><span>${bed.request}</span></div>`;
+  return `
+  <div class="card state-${bed.state}" data-id="${bed.id}">
+    <div class="card-head">
+      <div>
+        <div class="bed-id">Bed ${bed.id}</div>
+        <div class="patient-sub">Patient ID · ${bed.id}-2026</div>
+      </div>
+      ${ringSvg(bed.confidence, bed.state)}
+    </div>
+    <span class="pill"><span class="dot"></span>${stateLabel[bed.state]}</span>
+    ${reqBox}
+    <div class="meta-row">
+      <span>Tracking confidence</span>
+      <span class="time-ago">${bed.ago} ago</span>
+    </div>
+    <div class="card-footer">
+      <button class="btn btn-ack" ${!showAck ? 'disabled' : ''} onclick="acknowledge('${bed.id}')">
+        ${showAck ? 'Acknowledge' : (bed.state==='offline' ? 'Check camera' : 'No action needed')}
+      </button>
+      <button class="btn btn-ghost" title="View gesture history">↺</button>
+    </div>
+  </div>`;
+}
+
+function render(){
+  const filtered = currentFilter === 'all' ? beds : beds.filter(b => b.state === currentFilter);
+  if(filtered.length === 0){
+    grid.innerHTML = `<div class="empty-state"><div class="big">🟢</div>No beds match this filter right now.</div>`;
+  } else {
+    grid.innerHTML = filtered.map(cardHtml).join('');
+  }
+  updateCounts();
+}
+
+function updateCounts(){
+  document.getElementById('countUrgent').textContent = beds.filter(b=>b.state==='urgent').length;
+  document.getElementById('countAttention').textContent = beds.filter(b=>b.state==='attention').length;
+  document.getElementById('countCalm').textContent = beds.filter(b=>b.state==='calm').length;
+}
+
+function acknowledge(id){
+  const bed = beds.find(b => b.id === id);
+  if(!bed || bed.state === 'offline') return;
+  bed.state = 'calm';
+  bed.request = 'Last check-in: Acknowledged by nurse';
+  bed.icon = '✅';
+  bed.ago = '0s';
+  render();
+}
+
+document.getElementById('filters').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.tab');
+  if(!btn) return;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  currentFilter = btn.dataset.filter;
+  render();
+});
+
+function tickClock(){
+  const now = new Date();
+  document.getElementById('liveClock').textContent = now.toLocaleTimeString('en-GB');
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+render();
+</script>
+
+</body>
+</html>
