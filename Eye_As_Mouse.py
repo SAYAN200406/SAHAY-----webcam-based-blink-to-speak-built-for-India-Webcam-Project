@@ -44,7 +44,13 @@ except ImportError:
 # ============================================================
 # TWILIO & EMERGENCY CREDENTIALS
 # ============================================================
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+    DOTENV_AVAILABLE = True
+except ImportError:
+    DOTENV_AVAILABLE = False
+    def load_dotenv(**kwargs):  # no-op shim so the call below never throws
+        pass
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -109,7 +115,6 @@ def send_caregiver_alert(reason="Manual Emergency Button Pressed"):
 # PATHS / CONFIG
 # ============================================================
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 MODEL_PATH = os.path.join(BASE_DIR, "face_landmarker.task")
 MODEL_URL = (
@@ -159,7 +164,7 @@ def start_tracking():
         })
 
     tracking_process = subprocess.Popen(
-        ["py", os.path.abspath(__file__), "--track"],
+        [sys.executable, os.path.abspath(__file__), "--track"],
         cwd=BASE_DIR,
     )
 
@@ -167,7 +172,6 @@ def start_tracking():
         "status": "started",
         "message": "Eye tracking started."
     })
-
 
 @app.route("/stop", methods=["POST"])
 def stop_tracking():
@@ -185,7 +189,12 @@ def stop_tracking():
         else:
             tracking_process.terminate()
 
-        tracking_process.wait(timeout=3)
+        try:
+            tracking_process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            tracking_process.kill()
+            tracking_process.wait()
+
         tracking_process = None
 
         try:
@@ -248,7 +257,30 @@ def get_fps():
     return jsonify(data)
 
 
-# ============================================================
+@app.route("/dashboard")
+def dashboard():
+    return render_template("DashBoard.html")
+
+
+# Mock bed data — in a real deployment this would come from a database
+# or a per-bed Flask-SocketIO channel.
+BEDS_DATA = [
+    {"id": "04A", "state": "urgent",    "confidence": 91, "request": "Requesting: Pain relief",                 "icon": "⚠️",  "ago": "3m 12s"},
+    {"id": "02C", "state": "urgent",    "confidence": 87, "request": "Requesting: Nurse — repeated call",       "icon": "🔴",  "ago": "1m 40s"},
+    {"id": "05B", "state": "attention", "confidence": 78, "request": "Requesting: Water",                       "icon": "💧",  "ago": "2m 05s"},
+    {"id": "01A", "state": "attention", "confidence": 83, "request": "Requesting: Reposition",                  "icon": "🛏️", "ago": "1m 12s"},
+    {"id": "03D", "state": "calm",      "confidence": 95, "request": "Last check-in: All fine",                 "icon": "✅",  "ago": "6m 40s"},
+    {"id": "06A", "state": "calm",      "confidence": 90, "request": "Last check-in: Watching TV cue",          "icon": "✅",  "ago": "9m 02s"},
+    {"id": "07C", "state": "calm",      "confidence": 88, "request": "Last check-in: All fine",                 "icon": "✅",  "ago": "4m 55s"},
+    {"id": "08B", "state": "offline",   "confidence": 12, "request": "",                                        "icon": "",    "ago": "18m 20s"},
+]
+
+
+@app.route("/beds")
+def get_beds():
+    return jsonify(BEDS_DATA)
+
+
 # EYE / HEAD TRACKING
 # ============================================================
 
@@ -594,9 +626,12 @@ def run_eye_tracking():
 
             # Trigger automatic caregiver alert after 30 continuous seconds of no detection
             if inactive_seconds >= NO_RESPONSE_TIMEOUT and not no_response_alert_sent:
-                send_caregiver_alert(
-                    reason=f"No user detected for {NO_RESPONSE_TIMEOUT} seconds"
+                alert_thread = threading.Thread(
+                    target=send_caregiver_alert,
+                    kwargs={"reason": f"No user detected for {NO_RESPONSE_TIMEOUT} seconds"},
+                    daemon=True,
                 )
+                alert_thread.start()
                 no_response_alert_sent = True
 
         cv2.imshow("SAHAY Eye Mouse - press q to quit", frame)

@@ -19,6 +19,7 @@
             <img src="{{ url_for('static', filename='mods.jpg') }}" height="24" alt="Institution mark">
             <span id="navproject">TEAM DRISHTI · UDAAN 2.0</span>
         </div>
+        <a href="/dashboard" style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.12em;color:var(--text-low);text-transform:uppercase;text-decoration:none;" title="Ward Dashboard">Ward Console ↗</a>
     </div>
 
 
@@ -69,8 +70,8 @@
         <section id="communicationboard">
 
             <!-- YES -->
-            <button class="icon-div" id="first" onclick="voiceClick('YES')">
-                <div id="icon1">&#10004;</div>
+            <button class="icon-div" id="first" onclick="voiceClick('YES', 'Yes')">
+                <div class="icon1">&#10004;</div>
                 <div class="text">
                     <p>YES</p>
                     <span class="subtitle">Confirm choice</span>
@@ -79,8 +80,8 @@
 
 
             <!-- NO -->
-            <button class="icon-div" id="second" onclick="voiceClick('NO')">
-                <div id="icon1">&#10060;</div>
+            <button class="icon-div" id="second" onclick="voiceClick('NO', 'No')">
+                <div class="icon1">&#10060;</div>
                 <div class="text">
                     <p>NO</p>
                     <span class="subtitle">Reject choice</span>
@@ -89,8 +90,8 @@
 
 
             <!-- WATER -->
-            <button class="icon-div" id="theird" onclick="voiceClick('WATER')">
-                <div id="icon1">&#x1F4A7;</div>
+            <button class="icon-div" id="theird" onclick="voiceClick('WATER', 'I need water')">
+                <div class="icon1">&#x1F4A7;</div>
                 <div class="text">
                     <p>I NEED WATER</p>
                     <span class="subtitle">Request water</span>
@@ -99,8 +100,8 @@
 
 
             <!-- BATHROOM -->
-            <button class="icon-div" id="forth" onclick="voiceClick('BATHROOM')">
-                <div id="icon1">&#x1F6BD;</div>
+            <button class="icon-div" id="forth" onclick="voiceClick('BATHROOM', 'I need the bathroom')">
+                <div class="icon1">&#x1F6BD;</div>
                 <div class="text">
                     <p>BATHROOM / TOILET</p>
                     <span class="subtitle">Request bathroom</span>
@@ -109,8 +110,8 @@
 
 
             <!-- FOOD -->
-            <button class="icon-div" id="fifth" onclick="voiceClick('FOOD')">
-                <div id="icon1">&#127860;</div>
+            <button class="icon-div" id="fifth" onclick="voiceClick('FOOD', 'I need food')">
+                <div class="icon1">&#127860;</div>
                 <div class="text">
                     <p>I NEED FOOD</p>
                     <span class="subtitle">Request food</span>
@@ -119,8 +120,8 @@
 
 
             <!-- REPOSITION -->
-            <button class="icon-div" id="six" onclick="voiceClick('REPOSITION')">
-                <div id="icon1"><b>&#8634;</b></div>
+            <button class="icon-div" id="six" onclick="voiceClick('REPOSITION', 'Please reposition me')">
+                <div class="icon1"><b>&#8634;</b></div>
                 <div class="text">
                     <p>REPOSITION ME</p>
                     <span class="subtitle">Ask to be repositioned</span>
@@ -129,8 +130,8 @@
 
 
             <!-- HELP -->
-            <button class="icon-div" id="seventh" onclick="voiceClick('HELP')">
-                <div id="icon1">&#x270B;</div>
+            <button class="icon-div" id="seventh" onclick="voiceClick('HELP', 'I need help')">
+                <div class="icon1">&#x270B;</div>
                 <div class="text">
                     <p>I NEED HELP</p>
                     <span class="subtitle">Request assistance</span>
@@ -139,8 +140,8 @@
 
 
             <!-- CAREGIVER -->
-            <button class="icon-div" id="eight" onclick="voiceClick('CAREGIVER')">
-                <div id="icon1">&#128222;</div>
+            <button class="icon-div" id="eight" onclick="voiceClick('CAREGIVER', 'Please call the caregiver')">
+                <div class="icon1">&#128222;</div>
                 <div class="text">
                     <p>CALL CAREGIVER</p>
                     <span class="subtitle">Alert caregiver</span>
@@ -150,7 +151,7 @@
 
             <!-- EMERGENCY CARD -->
             <button class="icon-div emergency" id="nine" onclick="handleEmergencyClick()">
-                <div id="icon1">&#9888;</div>
+                <div class="icon1">&#9888;</div>
                 <div class="text">
                     <p>EMERGENCY</p>
                     <span class="subtitle">Send urgent alert</span>
@@ -254,8 +255,9 @@
             window.speechSynthesis.speak(voice);
         }
 
-        function voiceClick(buttonName) {
-            speak(buttonName + " clicked");
+        function voiceClick(buttonName, phrase) {
+            // Speak the natural phrase if provided; fall back to buttonName
+            speak(phrase || buttonName);
         }
 
 

@@ -251,6 +251,7 @@
   </div>
   <div class="topbar-right">
     <div class="clock">Shift started <b>07:00</b> · <span id="liveClock" class="mono">--:--:--</span></div>
+    <a href="/" style="font-size:12px;color:#A9B3CC;text-decoration:none;" title="Patient interface">← Patient view</a>
   </div>
 </div>
 
@@ -274,20 +275,23 @@
 <footer>SAHAY connects to each bedside webcam and reads head movement and blink pattern as intent · Tracking confidence shown per bed</footer>
 
 <script>
-const beds = [
-  { id:"04A", state:"urgent",   confidence:91, request:"Requesting: Pain relief", icon:"⚠️", ago:"3m 12s" },
-  { id:"02C", state:"urgent",   confidence:87, request:"Requesting: Nurse — repeated call", icon:"🔴", ago:"1m 40s" },
-  { id:"05B", state:"attention",confidence:78, request:"Requesting: Water", icon:"💧", ago:"2m 05s" },
-  { id:"01A", state:"attention",confidence:83, request:"Requesting: Reposition", icon:"🛏️", ago:"1m 12s" },
-  { id:"03D", state:"calm",     confidence:95, request:"Last check-in: All fine", icon:"✅", ago:"6m 40s" },
-  { id:"06A", state:"calm",     confidence:90, request:"Last check-in: Watching TV cue", icon:"✅", ago:"9m 02s" },
-  { id:"07C", state:"calm",     confidence:88, request:"Last check-in: All fine", icon:"✅", ago:"4m 55s" },
-  { id:"08B", state:"offline",  confidence:12, request:"", icon:"", ago:"18m 20s" },
-];
+let beds = [];
+let currentFilter = "all";
+const grid = document.getElementById("grid");
 
 const stateLabel = { urgent:"Urgent", attention:"Needs attention", calm:"Calm", offline:"Camera offline" };
-const grid = document.getElementById("grid");
-let currentFilter = "all";
+
+// Fetch beds from the Flask /beds API (fix 11)
+async function loadBeds() {
+  try {
+    const res = await fetch("/beds");
+    beds = await res.json();
+  } catch (e) {
+    // Fallback to empty — show a graceful empty state
+    beds = [];
+  }
+  render();
+}
 
 function ringSvg(pct, state){
   const r = 21, c = 2*Math.PI*r;
@@ -373,8 +377,9 @@ function tickClock(){
 setInterval(tickClock, 1000);
 tickClock();
 
-render();
+// Initial load from API
+loadBeds();
 </script>
 
 </body>
-</html>
+</html>

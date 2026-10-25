@@ -442,7 +442,7 @@ button {
     outline: none;
 }
 
-.icon-div #icon1 {
+.icon-div .icon1 {
     position: relative;
     z-index: 1;
     width: clamp(56px, 8vw, 72px);
